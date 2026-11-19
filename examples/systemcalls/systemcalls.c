@@ -1,4 +1,8 @@
 #include "systemcalls.h"
+#include "stdlib.h"
+#include "unistd.h"
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -17,7 +21,8 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    if (system(cmd) == 0) return true;
+    else return false;
 }
 
 /**
@@ -58,10 +63,18 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    int stat;
+    if (fork() == 0) {
+        execv(command[0], command);
+        exit(-1);
+    }
+
+    else wait(&stat);
 
     va_end(args);
 
-    return true;
+    if (stat == 0) return true;
+    else return false;
 }
 
 /**
@@ -93,7 +106,22 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    va_end(args);
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    int stat;
+    switch (fork()) {
+        case -1: return false;
+        case 0:
+            dup2(fd, 1);
+            close(fd);
+            execv(command[0], command);
+            va_end(args);
+            return true;
+        default:
+            wait(&stat);
+            va_end(args);
+            close(fd);
 
-    return true;
+            if (stat == 0) return true;
+            else return false;
+    }
 }
